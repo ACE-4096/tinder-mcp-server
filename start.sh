@@ -4,7 +4,7 @@ set -e
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOKEN_FILE="$HOME/.tinder-mcp-tokens.json"
 PID_FILE="$DIR/.server.pid"
-PORT=3000
+PORT=3100
 
 # ── helpers ────────────────────────────────────────────────────────────────
 log()  { echo "[tinder-mcp] $*"; }
@@ -16,8 +16,12 @@ server_running() {
 }
 
 token_valid() {
+  # Check env var first (captured from Playwright session)
+  local env_token
+  env_token=$(grep -E '^TINDER_AUTH_TOKEN=' "$DIR/.env" 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
+  [[ -n "$env_token" ]] && return 0
+  # Fallback: check token file
   [[ -f "$TOKEN_FILE" ]] || return 1
-  # Check if any token has a future expiresAt
   python3 -c "
 import json, time, sys
 data = json.load(open('$TOKEN_FILE'))

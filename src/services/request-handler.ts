@@ -332,14 +332,24 @@ class RequestHandler {
    * @param request - Client request
    */
   private addStandardHeaders(request: ClientRequest): void {
+    const fp = config.TINDER_FINGERPRINT;
     request.headers = {
       ...request.headers,
-      'app-version': '1020345',
-      'platform': 'web',
+      'app-version': fp.APP_VERSION,
+      'tinder-version': fp.TINDER_VERSION,
+      'platform': fp.PLATFORM,
       'content-type': 'application/json',
-      'x-supported-image-formats': 'webp,jpeg',
-      'user-agent': 'Tinder/1020345 (web) MCP-Server/1.0.0'
+      'accept': 'application/json',
+      'accept-language': fp.ACCEPT_LANGUAGE,
+      'x-supported-image-formats': fp.X_SUPPORTED_IMAGE_FORMATS,
+      'user-agent': fp.USER_AGENT,
+      'persistent-device-id': fp.PERSISTENT_DEVICE_ID,
+      'origin': 'https://tinder.com',
+      'referer': 'https://tinder.com/',
     };
+    if (fp.AUTH_TOKEN) {
+      request.headers['x-auth-token'] = fp.AUTH_TOKEN;
+    }
   }
 
   /**

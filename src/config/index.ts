@@ -44,12 +44,28 @@ interface SecurityConfig {
 }
 
 /**
+ * Tinder fingerprinting headers — captured from a real browser session.
+ * These must match what the Tinder web app sends or requests are rejected.
+ */
+interface TinderFingerprintConfig {
+  AUTH_TOKEN: string;
+  PERSISTENT_DEVICE_ID: string;
+  APP_VERSION: string;
+  TINDER_VERSION: string;
+  PLATFORM: string;
+  USER_AGENT: string;
+  X_SUPPORTED_IMAGE_FORMATS: string;
+  ACCEPT_LANGUAGE: string;
+}
+
+/**
  * Application configuration interface
  */
 interface AppConfig {
   NODE_ENV: string;
   PORT: number;
   TINDER_API: TinderApiConfig;
+  TINDER_FINGERPRINT: TinderFingerprintConfig;
   CACHE: CacheConfig;
   RATE_LIMIT: RateLimitConfig;
   SECURITY: SecurityConfig;
@@ -97,6 +113,18 @@ const config: AppConfig = {
     MAX_REQUESTS: parseIntEnv(process.env.RATE_LIMIT_MAX_REQUESTS, 100),
   },
   
+  // Tinder fingerprinting headers (captured via capture-auth.ts)
+  TINDER_FINGERPRINT: {
+    AUTH_TOKEN: process.env.TINDER_AUTH_TOKEN || '',
+    PERSISTENT_DEVICE_ID: process.env.TINDER_PERSISTENT_DEVICE_ID || '',
+    APP_VERSION: process.env.TINDER_HEADER_APP_VERSION || '1071600',
+    TINDER_VERSION: process.env.TINDER_HEADER_TINDER_VERSION || '7.16.0',
+    PLATFORM: process.env.TINDER_HEADER_PLATFORM || 'web',
+    USER_AGENT: process.env.TINDER_HEADER_USER_AGENT || 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
+    X_SUPPORTED_IMAGE_FORMATS: process.env.TINDER_HEADER_X_SUPPORTED_IMAGE_FORMATS || 'webp,jpeg',
+    ACCEPT_LANGUAGE: process.env.TINDER_HEADER_ACCEPT_LANGUAGE || 'en-GB',
+  },
+
   // Security configuration
   SECURITY: {
     // CRITICAL SECURITY FIX: Remove default token secret to prevent security vulnerabilities
