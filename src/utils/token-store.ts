@@ -3,24 +3,63 @@
  * Securely stores and manages authentication tokens
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 import NodeCache from 'node-cache';
 import logger from './logger';
 import { TokenData } from '../types';
 
+const TOKEN_FILE = path.join(os.homedir(), '.tinder-mcp-tokens.json');
+
 /**
  * Token store class
- * Manages authentication tokens for users
+ * Manages authentication tokens for users, persisted to disk so tokens
+ * survive server restarts and re-authentication is only needed when the
+ * Tinder refresh token itself expires (~24h).
  */
 class TokenStore {
   private tokenCache: NodeCache;
 
   constructor() {
-    // Initialize token cache
     this.tokenCache = new NodeCache({
-      stdTTL: 86400, // 24 hours default TTL
-      checkperiod: 600, // Check for expired keys every 10 minutes
-      useClones: false // Store references to objects
+      stdTTL: 86400,
+      checkperiod: 600,
+      useClones: false
     });
+    this.loadFromDisk();
+  }
+
+  private loadFromDisk(): void {
+    try {
+      if (!fs.existsSync(TOKEN_FILE)) return;
+      const entries: Record<string, TokenData> = JSON.parse(fs.readFileSync(TOKEN_FILE, 'utf-8'));
+      const now = Date.now();
+      let loaded = 0;
+      for (const [userId, tokenData] of Object.entries(entries)) {
+        if (tokenData.expiresAt > now) {
+          const ttl = Math.floor((tokenData.expiresAt - now) / 1000);
+          this.tokenCache.set(userId, tokenData, ttl);
+          loaded++;
+        }
+      }
+      if (loaded > 0) logger.info(`Loaded ${loaded} token(s) from disk`);
+    } catch (error) {
+      logger.warn(`Could not load tokens from disk: ${(error as Error).message}`);
+    }
+  }
+
+  private saveToDisk(): void {
+    try {
+      const entries: Record<string, TokenData> = {};
+      for (const userId of this.tokenCache.keys()) {
+        const tokenData = this.tokenCache.get<TokenData>(userId);
+        if (tokenData) entries[userId] = tokenData;
+      }
+      fs.writeFileSync(TOKEN_FILE, JSON.stringify(entries, null, 2), 'utf-8');
+    } catch (error) {
+      logger.error(`Could not save tokens to disk: ${(error as Error).message}`);
+    }
   }
 
   /**
@@ -45,16 +84,13 @@ class TokenStore {
    */
   public storeToken(userId: string, tokenData: TokenData): boolean {
     try {
-      // Calculate TTL in seconds (from now until expiry)
       const now = Date.now();
       const ttl = Math.floor((tokenData.expiresAt - now) / 1000);
-      
-      // Store token with calculated TTL
-      if (ttl > 0) {
-        return this.tokenCache.set(userId, tokenData, ttl);
-      } else {
-        return this.tokenCache.set(userId, tokenData);
-      }
+      const result = ttl > 0
+        ? this.tokenCache.set(userId, tokenData, ttl)
+        : this.tokenCache.set(userId, tokenData);
+      if (result) this.saveToDisk();
+      return result;
     } catch (error) {
       logger.error(`Error storing token for user ${userId}: ${(error as Error).message}`);
       return false;
@@ -68,7 +104,9 @@ class TokenStore {
    */
   public removeToken(userId: string): boolean {
     try {
-      return this.tokenCache.del(userId) > 0;
+      const result = this.tokenCache.del(userId) > 0;
+      if (result) this.saveToDisk();
+      return result;
     } catch (error) {
       logger.error(`Error removing token for user ${userId}: ${(error as Error).message}`);
       return false;
